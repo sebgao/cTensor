@@ -3,7 +3,7 @@ from ctensor import Tensor, relu, leaky_relu, sigmoid, Adam, binary_cross_entrop
 
 # Data Generation
 x = np.random.rand(1000, 5)*10 - 5
-x_scale = np.array([[1.2, 2, 0.4, 0.7, 0.2]])
+x_scale = np.array([1.2, 2, 0.4, 0.7, 0.2]).reshape(1, 5)
 x = x*x_scale
 y = x[:, 0]**2-2*x[:, 1]+10*x[:, 2]+0.04*x[:, 3]+np.abs(2*x[:, 4])
 y = ((y+np.random.rand(1000)) > 17).astype(np.float)
@@ -26,7 +26,7 @@ adam = Adam([M1, B1, M2, B2])
 
 def compute(X):
     X1 = relu((X @ M1) + B1)
-    X2 = sigmoid(((X1 @ M2)) + B2)
+    X2 = sigmoid((X1 @ M2) + B2)
     return X2
 
 for _ in range(1000):

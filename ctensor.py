@@ -259,7 +259,6 @@ class Operator:
             p.grad = x.grad
 
 class ReLU(Operator):
-    
     def forward(self, x):
         data = x.data 
         self.data = data
@@ -271,7 +270,6 @@ class ReLU(Operator):
         u.grad += x.grad*(data>=0)
 
 class LeakyReLU(Operator):
-    
     def forward(self, x):
         data = x.data 
         self.data = data
