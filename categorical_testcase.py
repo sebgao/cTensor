@@ -22,7 +22,7 @@ B2 = Tensor(np.random.randn(1, 1)/100)
 # Optimizer
 adam = Adam([M1, B1, M2, B2])
 
-# Computer Graph Definition, Note that the Graph is Actually Dynamic
+# Compute Graph Definition, note that the graph is actually dynamic
 
 def compute(X):
     X1 = relu((X @ M1) + B1)
@@ -38,6 +38,6 @@ for _ in range(1000):
     if _ % 100 == 0:
         print(loss)
 
-# If succeeded, the Score would be ralatively high.
+# If succeeded, the score would be relatively high
 pred_y = compute(X)
 print(((pred_y.data > 0.5) == Y.data).mean())
