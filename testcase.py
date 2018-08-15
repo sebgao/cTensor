@@ -13,7 +13,7 @@ def mul(x, y):
 
 a = Tensor(np.array([1, 2]))
 b = Tensor(np.array([2, 3]))
-r = a.view(1, 2) @ b.view(2, 1)
+r = a.view(1, 1, 2) @ b.view(1, 2, 1)
 print(r)
 r.backward()
 print(a.grad)

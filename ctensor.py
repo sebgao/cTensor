@@ -197,7 +197,7 @@ class Tensor:
         return Tensor(self.data[slic], precedents=[self, slic], operator='slice')
     
     def view(self, *shape):
-        return Reshape(shape)(self)
+        return View(shape)(self)
     
     def __repr__(self):
         return "Tensor({})".format(self.data)
@@ -298,7 +298,7 @@ class Sigmoid(Operator):
         u, = precedents
         u.grad += x.grad*(self.result)*(1-self.result)
 
-class Reshape(Operator):
+class View(Operator):
     def __init__(self, shape):
         self.shape = shape
     
