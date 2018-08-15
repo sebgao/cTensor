@@ -13,11 +13,11 @@ X = Tensor(x)
 Y = Tensor(y.reshape(1000, 1))
 
 # Parameters
-M1 = Tensor(np.random.randn(5, 100)/100)
-B1 = Tensor(np.random.randn(1, 100)/100)
+M1 = Tensor(np.random.randn(5, 100)/500)
+B1 = Tensor(np.zeros((1, 100)))
 
-M2 = Tensor(np.random.randn(100, 1)/20)
-B2 = Tensor(np.random.randn(1, 1)/100)
+M2 = Tensor(np.random.randn(100, 1)/100)
+B2 = Tensor(np.zeros((1, 1)))
 
 # Optimizer
 adam = Adam([M1, B1, M2, B2])
@@ -25,17 +25,20 @@ adam = Adam([M1, B1, M2, B2])
 # Compute Graph Definition, note that the graph is actually dynamic
 
 def compute(X):
-    X1 = relu((X @ M1) + B1)
+    X1 = leaky_relu((X @ M1) + B1, 0.01)
     X2 = sigmoid((X1 @ M2) + B2)
     return X2
 
-for _ in range(1000):
-    pred_y = compute(X)
-    loss = binary_cross_entropy(pred_y, Y)
+for _ in range(500):
+    indices = np.random.randint(0, 1000, size=128)
+    X_ = X[indices]
+    Y_ = Y[indices]
+    pred_y = compute(X_)
+    loss = binary_cross_entropy(pred_y, Y_)
     adam.zero_grad()
     loss.backward()
     adam.step(1e-3)
-    if _ % 100 == 0:
+    if _ % 1000 == 0:
         print(loss)
 
 # If succeeded, the score would be relatively high

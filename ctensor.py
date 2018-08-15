@@ -54,7 +54,7 @@ class Tensor:
         
         if isinstance(self.operator, Operator):
             self.operator.backward(self, self.precedents)
-        
+
         elif self.operator == 'neg':
             u, = self.precedents
             u.grad += -self.grad
@@ -196,6 +196,8 @@ class Tensor:
     def __getitem__(self, slic):
         return Tensor(self.data[slic], precedents=[self, slic], operator='slice')
     
+    def view(self, *shape):
+        return Reshape(shape)(self)
     
     def __repr__(self):
         return "Tensor({})".format(self.data)
@@ -248,46 +250,75 @@ class Adam(Optimizer):
             p.data -= lr*m/(np.sqrt(v)+self.eta)
 
 class Operator:
-    def forward(self, x):
-        return x
+    def forward(self, *args):
+        return args[0]
     
     def __call__(self, *args):
-        return Tensor(self.forward(*args).data, precedents=args, operator=self)
+        fwd = self.forward(*args)
+        if fwd.precedents:
+            return Tensor(fwd.data, precedents=[fwd], operator=self) # Operator in Tensor
+        else:
+            return Tensor(fwd.data, precedents=args, operator=self) # Operation in Numpy
     
     def backward(self, x, precedents):
-        for p in precedents:
-            p.grad = x.grad
+        p, = precedents
+        p.grad = x.grad
 
 class ReLU(Operator):
     def forward(self, x):
         data = x.data 
-        self.data = data
-        return Tensor(data*(data>=0))
+        self.loc = data >= 0
+        return Tensor(data*self.loc)
     
     def backward(self, x, precedents):
         u, = precedents
-        data = self.data
-        u.grad += x.grad*(data>=0)
+        u.grad += x.grad*self.loc
 
 class LeakyReLU(Operator):
+    def __init__(self, leaky_rate=0.01):
+        self.leaky_rate = leaky_rate
+
     def forward(self, x):
         data = x.data 
-        self.data = data
-        return Tensor(data*(data>=0) + 0.01*data*(data<0))
+        loc = data >= 0
+        self.effc = loc + self.leaky_rate*(1-loc)
+        return Tensor(data*self.effc)
     
     def backward(self, x, precedents):
         u, = precedents
-        data = self.data
-        u.grad += x.grad*(data>=0) + 0.01*x.grad*(data<0)
+        u.grad += x.grad*self.effc
+
+class Sigmoid(Operator):
+    def forward(self, x):
+        data = x.data
+        self.result = 1.0/(1.0+np.exp(-data))
+        return Tensor(self.result)
+
+    def backward(self, x, precedents):
+        u, = precedents
+        u.grad += x.grad*(self.result)*(1-self.result)
+
+class Reshape(Operator):
+    def __init__(self, shape):
+        self.shape = shape
+    
+    def forward(self, x):
+        self.origin_shape = x.data.shape
+        return Tensor(x.data.reshape(*self.shape))
+
+    def backward(self, x, precedents):
+        u, = precedents
+        u.grad += x.grad.reshape(self.origin_shape)
 
 def sigmoid(x):
-    return 1.0/(1.0+(-x).exp())
+    return Sigmoid()(x)
+    #return 1.0/(1.0+(-x).exp()) # slower implementation
 
 def relu(x):
     return ReLU()(x)
 
-def leaky_relu(x):
-    return LeakyReLU()(x)
+def leaky_relu(x, leaky_rate=0.01):
+    return LeakyReLU(leaky_rate=leaky_rate)(x)
 
 def mean_squared_error(pred, label):
     return ((pred-label)**2).mean()
