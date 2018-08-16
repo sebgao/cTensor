@@ -397,6 +397,25 @@ def batch_conv2d_im_backward(i, kernel):
     # kernel is (iC, oC, kH, kW) (b, v, k, l)
     return np.einsum('bchwkl,vckl->bvhw', x, kernel)#.mean(axis=(5, 4))
 
+def im2bchwkl(input, ksize, stride=(1, 1), padding=(0, 0)):
+
+    if padding != (0, 0):
+        input = make_padding(input, (padding[0], padding[1]))
+
+    isize = input.shape
+    istrides = input.strides
+
+    H = (isize[2]-ksize[0])//stride[0]+1
+    W = (isize[3]-ksize[1])//stride[1]+1
+
+    istrides = list(istrides+istrides[-2:])
+    istrides[2] *= stride[0]
+    istrides[3] *= stride[1]
+    return np.lib.stride_tricks.as_strided(input,
+        (isize[0], isize[1], H, W, ksize[0], ksize[1]),
+        istrides,
+        writeable=False
+    )
 
 def make_padding(input, padding):
     b, c, h, w = input.shape
