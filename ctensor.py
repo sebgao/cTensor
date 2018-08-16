@@ -320,6 +320,36 @@ class _Conv2d(Operator):
         t.grad += batch_conv2d_im_backward(x.grad, weight.data)
         weight.grad += batch_conv2d_weight_backward(x.grad, t.data) 
 
+class _MaxPooling(Operator):
+    def __init__(self, kernel=(2, 2), stride=(2, 2), padding=(0, 0)):
+        self.kernel = kernel
+        self.stride = stride
+        self.padding = padding
+    
+    def forward(self, t):
+        t = t.data
+        o = im2bchwkl(t, self.kernel, self.stride, self.padding)
+        B, C, H, W, K, L = o.shape
+        o = o.reshape(B, C, H, W, -1)
+        m = np.max(o, axis=4)
+        self.indice = (o == m[..., None]).reshape(B, C, H, W, K, L)
+        return Tensor(m)
+    
+    def backward(self, x, precedents):
+        t, = precedents
+        if self.padding != (0, 0):
+            grad = make_padding(t.grad, self.padding)
+            o = im2bchwkl(grad, self.kernel, self.stride, (0, 0), writeable=True)
+            o += (x.grad[..., None, None]*self.indice)
+            t.grad += grad[:, :, self.padding[0]:-self.padding[0], self.padding[1]:-self.padding[1]]
+        else:
+            o = im2bchwkl(t.grad, self.kernel, self.stride,
+                          (0, 0), writeable=True)
+            o += (x.grad[..., None, None]*self.indice)
+
+        
+
+
 class View(Operator):
     def __init__(self, shape):
         self.shape = shape
@@ -368,8 +398,9 @@ def batch_conv2d_im_backward(x, kernel):
     x = im2bchwkl(x, ksize[-2:], padding=(ksize[2]-1, ksize[3]-1))
     return np.einsum('bchwkl,vckl->bvhw', x, kernel)
 
-def im2bchwkl(input, ksize, stride=(1, 1), padding=(0, 0)):
+def im2bchwkl(input, ksize, stride=(1, 1), padding=(0, 0), writeable=False):
     if padding != (0, 0):
+        assert not writeable, 'No writable in padding mode.'
         input = make_padding(input, (padding[0], padding[1]))
 
     isize = input.shape
@@ -384,7 +415,7 @@ def im2bchwkl(input, ksize, stride=(1, 1), padding=(0, 0)):
     return np.lib.stride_tricks.as_strided(input,
         (isize[0], isize[1], H, W, ksize[0], ksize[1]),
         istrides,
-        writeable=False,
+        writeable=writeable,
     )
 
 def make_padding(input, padding):
