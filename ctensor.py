@@ -351,54 +351,24 @@ def binary_cross_entropy(pred, label):
 def conv2d(x, weight):
     return _Conv2d()(x, weight)
 
-def batch_conv2d(input, kernel):
-    isize = input.shape
-    istrides = input.strides
-    ksize = kernel.shape
-
-    H = isize[2]-ksize[2]+1
-    W = isize[3]-ksize[3]+1
-    x = np.lib.stride_tricks.as_strided(
-        input, (isize[0], isize[1], H, W, ksize[2], ksize[3]), istrides+istrides[-2:])
-    # x is (BATCH, iC, iH, iW, kH, kW) (b, c, h, w, k, l)
-    # kernel is (iC, oC, kH, kW) (c, v, k, l)
+def batch_conv2d(x, kernel):
+    x = im2bchwkl(x, kernel.shape[-2:])
     return np.einsum('...chwkl,cvkl->...vhw', x, kernel)
 
 
 def batch_conv2d_weight_backward(kernel, input):
     '''kernel is result tensor grad, input is original tensor'''
-    isize = input.shape
-    istrides = input.strides
-    ksize = kernel.shape
-
-    H = isize[2]-ksize[2]+1
-    W = isize[3]-ksize[3]+1
-    x = np.lib.stride_tricks.as_strided(
-        input, (isize[0], isize[1], H, W, ksize[2], ksize[3]), istrides+istrides[-2:])
-    # x is (BATCH, iC, iH, iW, kH, kW) (b, c, h, w, k, l)
-    # kernel is (iC, oC, kH, kW) (b, v, k, l)
+    x = im2bchwkl(input, kernel.shape[-2:])
     return np.einsum('bchwkl,bvkl->bcvhwkl', x, kernel).mean(axis=(6, 5, 0))
 
 
-def batch_conv2d_im_backward(i, kernel):
+def batch_conv2d_im_backward(x, kernel):
     '''input is result tensor grad, kernel is weight tensor'''
     ksize = kernel.shape
-
-    input = make_padding(i, (ksize[2]-1, ksize[3]-1))
-
-    isize = input.shape
-    istrides = input.strides
-
-    H = isize[2]-ksize[2]+1
-    W = isize[3]-ksize[3]+1
-    x = np.lib.stride_tricks.as_strided(
-        input, (isize[0], isize[1], H, W, ksize[2], ksize[3]), istrides+istrides[-2:])
-    # x is (BATCH, iC, iH, iW, kH, kW) (b, c, h, w, k, l)
-    # kernel is (iC, oC, kH, kW) (b, v, k, l)
-    return np.einsum('bchwkl,vckl->bvhw', x, kernel)#.mean(axis=(5, 4))
+    x = im2bchwkl(x, ksize[-2:], padding=(ksize[2]-1, ksize[3]-1))
+    return np.einsum('bchwkl,vckl->bvhw', x, kernel)
 
 def im2bchwkl(input, ksize, stride=(1, 1), padding=(0, 0)):
-
     if padding != (0, 0):
         input = make_padding(input, (padding[0], padding[1]))
 
@@ -414,7 +384,7 @@ def im2bchwkl(input, ksize, stride=(1, 1), padding=(0, 0)):
     return np.lib.stride_tricks.as_strided(input,
         (isize[0], isize[1], H, W, ksize[0], ksize[1]),
         istrides,
-        writeable=False
+        writeable=False,
     )
 
 def make_padding(input, padding):
