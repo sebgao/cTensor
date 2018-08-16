@@ -201,6 +201,14 @@ class Tensor:
     
     def __repr__(self):
         return "Tensor({})".format(self.data)
+
+    @staticmethod
+    def zeros(args):
+        return Tensor(np.zeros(args))
+    
+    @staticmethod
+    def randn(args):
+        return Tensor(np.random.randn(*args))
     
 class Optimizer:
     def __init__(self, parameters):
@@ -298,6 +306,20 @@ class Sigmoid(Operator):
         u, = precedents
         u.grad += x.grad*(self.result)*(1-self.result)
 
+class _Conv2d(Operator):
+    def forward(self, t, weight):
+        t = t.data
+        w = weight.data
+        B, C, iH, iW = t.shape
+        iC, oC, kH, kW = w.shape
+        assert C == iC, 'Conv2d channels in not equal.'
+        return Tensor(batch_conv2d(t, w))
+    
+    def backward(self, x, precedents):
+        t, weight = precedents
+        t.grad += batch_conv2d_im_backward(x.grad, weight.data)
+        weight.grad += batch_conv2d_weight_backward(x.grad, t.data) 
+
 class View(Operator):
     def __init__(self, shape):
         self.shape = shape
@@ -312,7 +334,7 @@ class View(Operator):
 
 def sigmoid(x):
     return Sigmoid()(x)
-    #return 1.0/(1.0+(-x).exp()) # slower implementation
+    #return  1.0/(1.0+(-x).exp()) # slower implementation
 
 def relu(x):
     return ReLU()(x)
@@ -325,3 +347,59 @@ def mean_squared_error(pred, label):
 
 def binary_cross_entropy(pred, label):
     return -((1. + 1e-6 -label)*((1. + 1e-6 -pred).log())+(label)*(pred.log())).mean()
+
+def conv2d(x, weight):
+    return _Conv2d()(x, weight)
+
+def batch_conv2d(input, kernel):
+    isize = input.shape
+    istrides = input.strides
+    ksize = kernel.shape
+
+    H = isize[2]-ksize[2]+1
+    W = isize[3]-ksize[3]+1
+    x = np.lib.stride_tricks.as_strided(
+        input, (isize[0], isize[1], H, W, ksize[2], ksize[3]), istrides+istrides[-2:])
+    # x is (BATCH, iC, iH, iW, kH, kW) (b, c, h, w, k, l)
+    # kernel is (iC, oC, kH, kW) (c, v, k, l)
+    return np.einsum('...chwkl,cvkl->...vhw', x, kernel)
+
+
+def batch_conv2d_weight_backward(kernel, input):
+    '''kernel is result tensor grad, input is original tensor'''
+    isize = input.shape
+    istrides = input.strides
+    ksize = kernel.shape
+
+    H = isize[2]-ksize[2]+1
+    W = isize[3]-ksize[3]+1
+    x = np.lib.stride_tricks.as_strided(
+        input, (isize[0], isize[1], H, W, ksize[2], ksize[3]), istrides+istrides[-2:])
+    # x is (BATCH, iC, iH, iW, kH, kW) (b, c, h, w, k, l)
+    # kernel is (iC, oC, kH, kW) (b, v, k, l)
+    return np.einsum('bchwkl,bvkl->bcvhwkl', x, kernel).mean(axis=(6, 5, 0))
+
+
+def batch_conv2d_im_backward(i, kernel):
+    '''input is result tensor grad, kernel is weight tensor'''
+    ksize = kernel.shape
+
+    input = make_padding(i, (ksize[2]-1, ksize[3]-1))
+
+    isize = input.shape
+    istrides = input.strides
+
+    H = isize[2]-ksize[2]+1
+    W = isize[3]-ksize[3]+1
+    x = np.lib.stride_tricks.as_strided(
+        input, (isize[0], isize[1], H, W, ksize[2], ksize[3]), istrides+istrides[-2:])
+    # x is (BATCH, iC, iH, iW, kH, kW) (b, c, h, w, k, l)
+    # kernel is (iC, oC, kH, kW) (b, v, k, l)
+    return np.einsum('bchwkl,vckl->bvhw', x, kernel)#.mean(axis=(5, 4))
+
+
+def make_padding(input, padding):
+    b, c, h, w = input.shape
+    result = np.zeros((b, c, h+2*padding[0], w+2*padding[1]), dtype=np.float)
+    result[:, :, padding[0]:-padding[0], padding[1]:-padding[1]] = input
+    return result
