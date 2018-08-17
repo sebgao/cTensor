@@ -430,8 +430,11 @@ def im2bchwkl(input, ksize, stride=(1, 1), padding=(0, 0), dilation=(1, 1), writ
     isize = input.shape
     istrides = input.strides
 
-    H = ((isize[2]-ksize[0])//(stride[0])+1)//dilation[0]
-    W = ((isize[3]-ksize[1])//(stride[1])+1)//dilation[1]
+    H = ((isize[2]-ksize[0])/(stride[0])+1)/dilation[0]
+    W = ((isize[3]-ksize[1])/(stride[1])+1)/dilation[1]
+    assert int(H) == H and int(W) == W, 'conv2d not aligned'
+    H = int(H)
+    W = int(W)
     istrides = list(istrides+istrides[-2:])
     istrides[2] *= stride[0]
     istrides[3] *= stride[1]
