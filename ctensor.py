@@ -307,9 +307,13 @@ class Sigmoid(Operator):
         u.grad += x.grad*(self.result)*(1-self.result)
 
 class _Conv2d(Operator):
+    def __init__(self, padding=(0, 0)):
+        self.padding = padding
+
     def forward(self, t, weight):
         t = t.data
         w = weight.data
+        t = make_padding(t, self.padding)
         B, C, iH, iW = t.shape
         iC, oC, kH, kW = w.shape
         assert C == iC, 'Conv2d channels in not equal.'
@@ -317,8 +321,12 @@ class _Conv2d(Operator):
     
     def backward(self, x, precedents):
         t, weight = precedents
-        t.grad += batch_conv2d_im_backward(x.grad, weight.data)
-        weight.grad += batch_conv2d_weight_backward(x.grad, t.data) 
+        if self.padding != (0, 0):
+            p, q = self.padding
+            t.grad += batch_conv2d_im_backward(x.grad, weight.data)[..., p:-p, q:-q]
+        else:
+            t.grad += batch_conv2d_im_backward(x.grad, weight.data)
+        weight.grad += batch_conv2d_weight_backward(x.grad, make_padding(t.data, self.padding)) 
 
 class _MaxPooling(Operator):
     def __init__(self, kernel=(2, 2), stride=(2, 2), padding=(0, 0)):
@@ -378,8 +386,11 @@ def mean_squared_error(pred, label):
 def binary_cross_entropy(pred, label):
     return -((1. + 1e-6 -label)*((1. + 1e-6 -pred).log())+(label)*(pred.log())).mean()
 
-def conv2d(x, weight):
-    return _Conv2d()(x, weight)
+def conv2d(x, weight, padding=(0, 0)):
+    return _Conv2d(padding)(x, weight)
+
+def max_pooling(x, kernel=(2, 2), stride=(2, 2), padding=(0, 0)):
+    return _MaxPooling(kernel, stride, padding)(x)
 
 def batch_conv2d(x, kernel):
     x = im2bchwkl(x, kernel.shape[-2:])
@@ -395,8 +406,13 @@ def batch_conv2d_weight_backward(kernel, input):
 def batch_conv2d_im_backward(x, kernel):
     '''input is result tensor grad, kernel is weight tensor'''
     ksize = kernel.shape
-    x = im2bchwkl(x, ksize[-2:], padding=(ksize[2]-1, ksize[3]-1))
-    return np.einsum('bchwkl,vckl->bvhw', x, kernel)
+    x = make_padding(x, ((ksize[2]-1), (ksize[3]-1)))
+    return batch_transposed_conv2d(x, kernel, operator='...chwkl,vckl->...vhw')
+
+def batch_transposed_conv2d(x, kernel, operator='...chwkl,cvkl->...vhw'):
+    ksize = kernel.shape
+    x = im2bchwkl(x, ksize[-2:])[...,::-1, ::-1]
+    return np.einsum(operator, x, kernel)
 
 def im2bchwkl(input, ksize, stride=(1, 1), padding=(0, 0), writeable=False):
     if padding != (0, 0):
@@ -419,6 +435,8 @@ def im2bchwkl(input, ksize, stride=(1, 1), padding=(0, 0), writeable=False):
     )
 
 def make_padding(input, padding):
+    if padding == (0, 0):
+        return input
     b, c, h, w = input.shape
     result = np.zeros((b, c, h+2*padding[0], w+2*padding[1]), dtype=np.float)
     result[:, :, padding[0]:-padding[0], padding[1]:-padding[1]] = input

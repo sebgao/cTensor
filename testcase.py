@@ -1,23 +1,43 @@
 import numpy as np
-from ctensor import Tensor, conv2d, Adam, relu, SGD, leaky_relu, _MaxPooling
+from ctensor import Tensor, conv2d, Adam, relu, SGD, leaky_relu, _MaxPooling, _Conv2d, sigmoid
 
-maxpooling = _MaxPooling(kernel=(2, 2), stride=(2, 2), padding=(0, 0))
-#maxpooling = _MaxPooling()
-data = np.array(
+
+D = np.array(
     [
     [
-        [0, 0, 0, 0],
-        [0, 1, 0, 0],
-        [0, 1, 1, 1],
-        [0, 0, 0, 0],
+        [0.1, 0.2, 0.3],
+        [0.1, 0.2, 0.2],
+        [0.1, 0.1, 1],
     ]
     ]
-    ).reshape(1, 1, 4, 4)
+    ).reshape(1, 1, 3, 3)
 
-data = Tensor(data)
-print(maxpooling(data))
-maxpooling(data).backward()
-print(data.grad)
+T = np.array(
+    [
+        [0, 1, 0],
+        [1, 0, 1],
+        [0, 1, 0]
+    ]
+).reshape(1, 1, 3, 3)
+#print(data, weight)
+D = Tensor.randn((1, 1, 3, 3))
+T = Tensor(T)
+W1 = Tensor.randn((1, 100, 3, 3))/(4.5)
+W2 = Tensor.randn((100, 1, 3, 3))/(4.5*100)
+B1 = Tensor.zeros((1, 100, 3, 3))
+B2 = Tensor.zeros((1, 1, 3, 3))
+adam = Adam([W1, W2, B1, B2])
+for _ in range(1000):
+    I = conv2d(D, W1, padding=(1, 1))+B1
+    I = leaky_relu(I)
+    I = conv2d(I, W2, padding=(1, 1))+B2
+    I = sigmoid(I)
+    adam.zero_grad()
+    ((I-T)**2).backward()
+    adam.step(1e-2)
+    #print(data.grad)
+    #print(weight.grad)
+    print(I)
 
 # W1 = Tensor.randn((1, 100, 3, 3))/3.5
 # W2 = Tensor.randn((100, 1, 3, 3))/(3.5*100)

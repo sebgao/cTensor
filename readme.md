@@ -4,7 +4,8 @@ The cTensor (crafted tensor) is a super light-weight deep learning library (perh
 Stars are welcomed! : )
 
 ### 2018.8.17
-Now support __max_padding__ operation with any stride, kernel size and padding.
+~~Now support __max_pooling__ operation with any stride, kernel size and padding.~~
+Fix buges related to Conv2d backpropagation.
 ### 2018.8.16
 We have supported batch __conv2d__ operation in pytorch fashion (limited in stride 1, no padding) !!
 ### 2018.8.14
