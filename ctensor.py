@@ -307,8 +307,9 @@ class Sigmoid(Operator):
         u.grad += x.grad*(self.result)*(1-self.result)
 
 class _Conv2d(Operator):
-    def __init__(self, padding=(0, 0)):
+    def __init__(self, padding=(0, 0), stride=(1, 1)):
         self.padding = padding
+        self.stride = stride
 
     def forward(self, t, weight):
         t = t.data
@@ -317,16 +318,20 @@ class _Conv2d(Operator):
         B, C, iH, iW = t.shape
         iC, oC, kH, kW = w.shape
         assert C == iC, 'Conv2d channels in not equal.'
-        return Tensor(batch_conv2d(t, w))
+        return Tensor(batch_conv2d(t, w, self.stride))
     
     def backward(self, x, precedents):
         t, weight = precedents
-        if self.padding != (0, 0):
-            p, q = self.padding
-            t.grad += batch_conv2d_im_backward(x.grad, weight.data)[..., p:-p, q:-q]
-        else:
-            t.grad += batch_conv2d_im_backward(x.grad, weight.data)
-        weight.grad += batch_conv2d_weight_backward(x.grad, make_padding(t.data, self.padding)) 
+        
+        t.grad += unwrap_padding(
+            batch_conv2d_im_backward(x.grad, weight.data, self.stride),
+            self.padding
+        )
+        weight.grad += batch_conv2d_weight_backward(
+            x.grad,
+            make_padding(t.data, self.padding),
+            self.stride
+        ) 
 
 class _MaxPooling(Operator):
     def __init__(self, kernel=(2, 2), stride=(2, 2), padding=(0, 0)):
@@ -386,35 +391,38 @@ def mean_squared_error(pred, label):
 def binary_cross_entropy(pred, label):
     return -((1. + 1e-6 -label)*((1. + 1e-6 -pred).log())+(label)*(pred.log())).mean()
 
-def conv2d(x, weight, padding=(0, 0)):
-    return _Conv2d(padding)(x, weight)
+def conv2d(x, weight, padding=(0, 0), stride=(1, 1)):
+    return _Conv2d(padding, stride)(x, weight)
 
 def max_pooling(x, kernel=(2, 2), stride=(2, 2), padding=(0, 0)):
     return _MaxPooling(kernel, stride, padding)(x)
 
-def batch_conv2d(x, kernel):
-    x = im2bchwkl(x, kernel.shape[-2:])
+def batch_conv2d(x, kernel, stride=(1, 1)):
+    x = im2bchwkl(x, kernel.shape[-2:], stride)
     return np.einsum('...chwkl,cvkl->...vhw', x, kernel)
 
 
-def batch_conv2d_weight_backward(kernel, input):
+def batch_conv2d_weight_backward(kernel, input, stride=(1, 1)):
     '''kernel is result tensor grad, input is original tensor'''
-    x = im2bchwkl(input, kernel.shape[-2:])
+    x = im2bchwkl(input, kernel.shape[-2:], dilation=stride)
     return np.einsum('bchwkl,bvkl->bcvhwkl', x, kernel).mean(axis=(6, 5, 0))
 
 
-def batch_conv2d_im_backward(x, kernel):
+def batch_conv2d_im_backward(x, kernel, stride=(1, 1)):
     '''input is result tensor grad, kernel is weight tensor'''
     ksize = kernel.shape
+    x = dilate_input(x, stride)
     x = make_padding(x, ((ksize[2]-1), (ksize[3]-1)))
     return batch_transposed_conv2d(x, kernel, operator='...chwkl,vckl->...vhw')
 
 def batch_transposed_conv2d(x, kernel, operator='...chwkl,cvkl->...vhw'):
     ksize = kernel.shape
-    x = im2bchwkl(x, ksize[-2:])[...,::-1, ::-1]
+    x = transpose_kernel(
+        im2bchwkl(x, ksize[-2:])
+    )
     return np.einsum(operator, x, kernel)
 
-def im2bchwkl(input, ksize, stride=(1, 1), padding=(0, 0), writeable=False):
+def im2bchwkl(input, ksize, stride=(1, 1), padding=(0, 0), dilation=(1, 1), writeable=False):
     if padding != (0, 0):
         assert not writeable, 'No writable in padding mode.'
         input = make_padding(input, (padding[0], padding[1]))
@@ -422,12 +430,13 @@ def im2bchwkl(input, ksize, stride=(1, 1), padding=(0, 0), writeable=False):
     isize = input.shape
     istrides = input.strides
 
-    H = (isize[2]-ksize[0])//stride[0]+1
-    W = (isize[3]-ksize[1])//stride[1]+1
-
+    H = ((isize[2]-ksize[0])//(stride[0])+1)//dilation[0]
+    W = ((isize[3]-ksize[1])//(stride[1])+1)//dilation[1]
     istrides = list(istrides+istrides[-2:])
     istrides[2] *= stride[0]
     istrides[3] *= stride[1]
+    istrides[4] *= dilation[0]
+    istrides[5] *= dilation[1]
     return np.lib.stride_tricks.as_strided(input,
         (isize[0], isize[1], H, W, ksize[0], ksize[1]),
         istrides,
@@ -441,3 +450,22 @@ def make_padding(input, padding):
     result = np.zeros((b, c, h+2*padding[0], w+2*padding[1]), dtype=np.float)
     result[:, :, padding[0]:-padding[0], padding[1]:-padding[1]] = input
     return result
+
+def unwrap_padding(input, padding):
+    if padding == (0, 0):
+        return input
+    p, q = padding
+    return input[..., p:-p, q:-q]
+
+def transpose_kernel(kernel):
+    return kernel[..., ::-1, ::-1]
+
+
+def dilate_input(input, stride=(1, 1)):
+    if stride == (1, 1):
+        return input
+    isize = input.shape
+    x = np.zeros((isize[0], isize[1], (isize[2]-1) *
+                  stride[0]+1, (isize[3]-1)*stride[1]+1))
+    x[..., ::stride[0], ::stride[1]] = input
+    return x

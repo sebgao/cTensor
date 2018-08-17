@@ -14,9 +14,9 @@ D = np.array(
 
 T = np.array(
     [
-        [0, 1, 0],
+        [0, 1, 0.5],
         [1, 0, 1],
-        [0, 1, 0]
+        [1, 1, 0]
     ]
 ).reshape(1, 1, 3, 3)
 #print(data, weight)
@@ -32,12 +32,13 @@ for _ in range(1000):
     I = leaky_relu(I)
     I = conv2d(I, W2, padding=(1, 1))+B2
     I = sigmoid(I)
+    loss = ((I-T)**2)
     adam.zero_grad()
-    ((I-T)**2).backward()
+    loss.backward()
     adam.step(1e-2)
     #print(data.grad)
     #print(weight.grad)
-    print(I)
+    print(loss.mean())
 
 # W1 = Tensor.randn((1, 100, 3, 3))/3.5
 # W2 = Tensor.randn((100, 1, 3, 3))/(3.5*100)
