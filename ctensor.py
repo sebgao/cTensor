@@ -318,16 +318,16 @@ class _Conv2d(Operator):
         B, C, iH, iW = t.shape
         iC, oC, kH, kW = w.shape
         assert C == iC, 'Conv2d channels in not equal.'
-        return Tensor(batch_conv2d(t, w, self.stride))
+        return Tensor(batch_conv2d_f(t, w, self.stride))
     
     def backward(self, x, precedents):
         t, weight = precedents
         
         t.grad += unwrap_padding(
-            batch_conv2d_im_backward(x.grad, weight.data, self.stride),
+            batch_conv2d_im_backward_f(x.grad, weight.data, self.stride),
             self.padding
         )
-        weight.grad += batch_conv2d_weight_backward(
+        weight.grad += batch_conv2d_weight_backward_f(
             x.grad,
             make_padding(t.data, self.padding),
             self.stride
@@ -340,25 +340,11 @@ class _MaxPooling(Operator):
         self.padding = padding
     
     def forward(self, t):
-        t = t.data
-        o = im2bchwkl(t, self.kernel, self.stride, self.padding)
-        B, C, H, W, K, L = o.shape
-        o = o.reshape(B, C, H, W, -1)
-        m = np.max(o, axis=4)
-        self.indice = (o == m[..., None]).reshape(B, C, H, W, K, L)
-        return Tensor(m)
+        assert False
     
     def backward(self, x, precedents):
         t, = precedents
-        if self.padding != (0, 0):
-            grad = make_padding(t.grad, self.padding)
-            o = im2bchwkl(grad, self.kernel, self.stride, (0, 0), writeable=True)
-            o += (x.grad[..., None, None]*self.indice)
-            t.grad += grad[:, :, self.padding[0]:-self.padding[0], self.padding[1]:-self.padding[1]]
-        else:
-            o = im2bchwkl(t.grad, self.kernel, self.stride,
-                          (0, 0), writeable=True)
-            o += (x.grad[..., None, None]*self.indice)
+        assert False
 
         
 
@@ -375,7 +361,7 @@ class View(Operator):
         u, = precedents
         u.grad += x.grad.reshape(self.origin_shape)
 
-def sigmoid(x):
+def sigmoid(x): 
     return Sigmoid()(x)
     #return  1.0/(1.0+(-x).exp()) # slower implementation
 
@@ -415,12 +401,49 @@ def batch_conv2d_im_backward(x, kernel, stride=(1, 1)):
     x = make_padding(x, ((ksize[2]-1), (ksize[3]-1)))
     return batch_transposed_conv2d(x, kernel, operator='...chwkl,vckl->...vhw')
 
+
 def batch_transposed_conv2d(x, kernel, operator='...chwkl,cvkl->...vhw'):
     ksize = kernel.shape
     x = transpose_kernel(
         im2bchwkl(x, ksize[-2:])
     )
     return np.einsum(operator, x, kernel)
+
+
+def batch_conv2d_f(x, kernel, stride=(1, 1)):
+    x = im2bchwkl(x, kernel.shape[-2:], stride)
+    return np.tensordot(x, kernel, [(1, 4, 5), (0, 2, 3)]).transpose(0, 3, 1, 2)
+
+
+def batch_conv2d_weight_backward_f(kernel, input, stride=(1, 1)):
+    '''kernel is result tensor grad, input is original tensor'''
+    B, C, H, W = kernel.shape
+    x = im2bchwkl(input, kernel.shape[-2:], dilation=stride)
+    return np.tensordot(x, kernel, [(0, 4, 5), (0, 2, 3)]).transpose(0, 3, 1, 2)*(1.0/(B*H*W))
+
+
+def batch_conv2d_im_backward_f(x, kernel, stride=(1, 1)):
+    '''input is result tensor grad, kernel is weight tensor'''
+    ksize = kernel.shape
+    x = dilate_input(x, stride)
+    x = make_padding(x, ((ksize[2]-1), (ksize[3]-1)))
+    #print(x.shape, kernel.shape)
+    return batch_transposed_conv2d_f(x, kernel, invert=True)
+
+
+def batch_transposed_conv2d_f(x, kernel, invert=False):
+    ksize = kernel.shape
+    x = transpose_kernel(
+        im2bchwkl(x, ksize[-2:])
+    )
+    i = 1 if invert else 0
+    return np.tensordot(x, kernel, [(1, 4, 5), (i, 2, 3)]).transpose(0, 3, 1, 2)
+    #return np.einsum(operator, x, kernel)
+
+def im2col(input, ksize, stride=(1, 1), dilation=(1, 1)):
+    x = im2bchwkl(input, ksize, stride=stride, dilation=dilation)
+    B, C, H, W, K, L = x.shape
+    return x.rehape(B, C, H*W, K*L)
 
 def im2bchwkl(input, ksize, stride=(1, 1), padding=(0, 0), dilation=(1, 1), writeable=False):
     if padding != (0, 0):
@@ -430,8 +453,8 @@ def im2bchwkl(input, ksize, stride=(1, 1), padding=(0, 0), dilation=(1, 1), writ
     isize = input.shape
     istrides = input.strides
 
-    H = ((isize[2]-ksize[0])/(stride[0])+1)/dilation[0]
-    W = ((isize[3]-ksize[1])/(stride[1])+1)/dilation[1]
+    H = (isize[2]-(dilation[0]*(ksize[0]-1)+1))/(stride[0])+1
+    W = (isize[3]-(dilation[1]*(ksize[1]-1)+1))/(stride[1])+1
     assert int(H) == H and int(W) == W, 'conv2d not aligned'
     H = int(H)
     W = int(W)
