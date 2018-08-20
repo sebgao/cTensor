@@ -5,13 +5,14 @@ def T(x):
 
     return x.transpose(0, 2, 1)
 
-def makeTensorLike(another, sel):
+def make_tensor_like(another, sel):
     '''Make the operand a tensor.'''
 
     assert isinstance(another, int) or isinstance(another, float) or isinstance(another, Tensor), 'Cannot convert to tensor'
 
     if isinstance(another, int) or isinstance(another, float):
-        return Tensor(np.zeros_like(sel.data)+another)
+        s = (1,)*len(sel.data.shape)
+        return Tensor(np.zeros(s)+another, requires_grad=False)
     return another
 
 def attach_grad(u, grad):
@@ -19,15 +20,17 @@ def attach_grad(u, grad):
     During backpropagation, attach computed grad into precedents.
     If forward process includes broadcasting, unbroadcast grad.
     '''
+    if not u.requires_grad:
+        return
 
     if u.grad.shape == grad.shape:
         u.grad += grad
         return
     
     # unbroadcasting
-    for dim, chn in enumerate(u.grad):
-        if u.grad.shape[dim] != grad.shape[dim]:
-            assert u.grad.shape[dim] == 1, "Backward unbroadcasting errors"
+    for dim, chn in enumerate(u.grad.shape):
+        if chn != grad.shape[dim]:
+            assert chn == 1, "Backward unbroadcasting errors"
             grad = grad.mean(axis = dim, keepdims = True)
             
     u.grad += grad
@@ -150,41 +153,41 @@ class Tensor:
         return Tensor(np.log(self.data), precedents=[self], operator='log')
     
     def __add__(self, another):
-        another = makeTensorLike(another, self)
+        another = make_tensor_like(another, self)
         return Tensor(self.data + another.data, precedents=[self, another], operator='+')
     
     def __radd__(self, another):
         return Tensor.__add__(self, another)
     
     def __sub__(self, another):
-        another = makeTensorLike(another, self)
+        another = make_tensor_like(another, self)
         return Tensor(self.data - another.data, precedents=[self, another], operator='-')
     
     def greater(self, another):
-        another = makeTensorLike(another, self)
+        another = make_tensor_like(another, self)
         return Tensor(self.data > another.data, precedents=[self, another], operator='greater', requires_grad=False)
     
     def __rsub__(self, another):
-        another = makeTensorLike(another, self)
+        another = make_tensor_like(another, self)
         return Tensor.__sub__(another, self)
     
     def __pow__(self, another):
-        another = makeTensorLike(another, self)
+        another = make_tensor_like(another, self)
         another.requires_grad = False
         return Tensor(self.data ** another.data, precedents=[self, another], operator='**')
       
     def __truediv__(self, another):
         assert isinstance(another, int) or isinstance(another, float),         'Right divide only supports int or float. Please use *'
-        another = makeTensorLike(another, self)
+        another = make_tensor_like(another, self)
         another.data = 1.0/another.data
         return Tensor.__mul__(self, another)
     
     def __rtruediv__(self, another):
-        another = makeTensorLike(another, self)
+        another = make_tensor_like(another, self)
         return Tensor(another.data / self.data, precedents=[self, another], operator='/')
     
     def __mul__(self, another):
-        another = makeTensorLike(another, self)
+        another = make_tensor_like(another, self)
         return Tensor(self.data * another.data, precedents=[self, another], operator='*')
     
     def __rmul__(self, another):
@@ -333,22 +336,6 @@ class _Conv2d(Operator):
             self.stride
         ) 
 
-class _MaxPooling(Operator):
-    def __init__(self, kernel=(2, 2), stride=(2, 2), padding=(0, 0)):
-        self.kernel = kernel
-        self.stride = stride
-        self.padding = padding
-    
-    def forward(self, t):
-        assert False
-    
-    def backward(self, x, precedents):
-        t, = precedents
-        assert False
-
-        
-
-
 class View(Operator):
     def __init__(self, shape):
         self.shape = shape
@@ -380,36 +367,6 @@ def binary_cross_entropy(pred, label):
 def conv2d(x, weight, padding=(0, 0), stride=(1, 1)):
     return _Conv2d(padding, stride)(x, weight)
 
-def max_pooling(x, kernel=(2, 2), stride=(2, 2), padding=(0, 0)):
-    return _MaxPooling(kernel, stride, padding)(x)
-
-def batch_conv2d(x, kernel, stride=(1, 1)):
-    x = im2bchwkl(x, kernel.shape[-2:], stride)
-    return np.einsum('...chwkl,cvkl->...vhw', x, kernel)
-
-
-def batch_conv2d_weight_backward(kernel, input, stride=(1, 1)):
-    '''kernel is result tensor grad, input is original tensor'''
-    x = im2bchwkl(input, kernel.shape[-2:], dilation=stride)
-    return np.einsum('bchwkl,bvkl->bcvhwkl', x, kernel).mean(axis=(6, 5, 0))
-
-
-def batch_conv2d_im_backward(x, kernel, stride=(1, 1)):
-    '''input is result tensor grad, kernel is weight tensor'''
-    ksize = kernel.shape
-    x = dilate_input(x, stride)
-    x = make_padding(x, ((ksize[2]-1), (ksize[3]-1)))
-    return batch_transposed_conv2d(x, kernel, operator='...chwkl,vckl->...vhw')
-
-
-def batch_transposed_conv2d(x, kernel, operator='...chwkl,cvkl->...vhw'):
-    ksize = kernel.shape
-    x = transpose_kernel(
-        im2bchwkl(x, ksize[-2:])
-    )
-    return np.einsum(operator, x, kernel)
-
-
 def batch_conv2d_f(x, kernel, stride=(1, 1)):
     x = im2bchwkl(x, kernel.shape[-2:], stride)
     return np.tensordot(x, kernel, [(1, 4, 5), (0, 2, 3)]).transpose(0, 3, 1, 2)
@@ -440,10 +397,6 @@ def batch_transposed_conv2d_f(x, kernel, invert=False):
     return np.tensordot(x, kernel, [(1, 4, 5), (i, 2, 3)]).transpose(0, 3, 1, 2)
     #return np.einsum(operator, x, kernel)
 
-def im2col(input, ksize, stride=(1, 1), dilation=(1, 1)):
-    x = im2bchwkl(input, ksize, stride=stride, dilation=dilation)
-    B, C, H, W, K, L = x.shape
-    return x.rehape(B, C, H*W, K*L)
 
 def im2bchwkl(input, ksize, stride=(1, 1), padding=(0, 0), dilation=(1, 1), writeable=False):
     if padding != (0, 0):
@@ -473,8 +426,9 @@ def make_padding(input, padding):
     if padding == (0, 0):
         return input
     b, c, h, w = input.shape
-    result = np.zeros((b, c, h+2*padding[0], w+2*padding[1]), dtype=np.float)
-    result[:, :, padding[0]:-padding[0], padding[1]:-padding[1]] = input
+    p, q = padding
+    result = np.zeros((b, c, h+2*p, w+2*q), dtype=np.float)
+    result[:, :, p:-p, q:-q] = input
     return result
 
 def unwrap_padding(input, padding):
@@ -485,7 +439,6 @@ def unwrap_padding(input, padding):
 
 def transpose_kernel(kernel):
     return kernel[..., ::-1, ::-1]
-
 
 def dilate_input(input, stride=(1, 1)):
     if stride == (1, 1):
