@@ -1,5 +1,7 @@
 import numpy as np
-from ctensor import Tensor, relu, leaky_relu, sigmoid, Adam, binary_cross_entropy
+from ctensor import Tensor
+from ctensor.functional import leaky_relu, sigmoid, binary_cross_entropy
+from ctensor.optim import Adam
 
 # Data Generation
 x = np.random.rand(1000, 5)*10 - 5
@@ -29,7 +31,7 @@ def compute(X):
     X2 = sigmoid((X1 @ M2) + B2)
     return X2
 
-for _ in range(500):
+for _ in range(10000):
     indices = np.random.randint(0, 1000, size=128)
     X_ = X[indices]
     Y_ = Y[indices]

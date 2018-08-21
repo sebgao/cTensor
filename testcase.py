@@ -1,5 +1,7 @@
 import numpy as np
-from ctensor import Tensor, conv2d, Adam, relu, SGD, leaky_relu, _MaxPooling, _Conv2d, sigmoid
+from ctensor import Tensor
+from ctensor.optim import Adam
+from ctensor.functional import conv2d, relu
 
 
 D = Tensor.randn((1, 1, 50, 50))
