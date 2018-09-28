@@ -49,7 +49,22 @@ class Linear(Module):
     
     def forward(self, x):
         return x @ self.w + self.bias
+
+class Conv2d(Module):
+    def __init__(self, in_channels, out_channels, kernel_size=(3, 3), padding=(1, 1), stride=(1, 1), bias=True):
+        param = (in_channels, ) + (out_channels, ) + kernel_size
+        self.w = Parameter(
+            np.random.randn(*param)/(in_channels*(kernel_size[0]*kernel_size[1])**0.5)
+            )
+        if bias:
+            self.bias = Parameter(np.zeros((1, out_channels, 1, 1)))
+        else:
+            self.bias = 0
+        self.padding = padding
+        self.stride = stride
     
+    def forward(self, x):
+        return F.conv2d(x, self.w, self.padding, self.stride) + self.bias
 
 class ReLU(Module):
     def forward(self, x):

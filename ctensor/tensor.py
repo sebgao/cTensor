@@ -226,7 +226,7 @@ class Operator:
             # Operator in Tensor
             return Tensor(fwd.data, precedents=[fwd], operator=self)
         else:
-            # Operation in Numpy
+            # Operation in NumPy
             return Tensor(fwd.data, precedents=args, operator=self)
 
     def backward(self, x, precedents):

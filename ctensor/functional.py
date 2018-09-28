@@ -18,7 +18,7 @@ def mean_squared_error(pred, label):
 
 
 def binary_cross_entropy(pred, label):
-    return -((1. + 1e-6 - label)*((1. + 1e-6 - pred).log())+(label)*(pred.log())).mean()
+    return -((1. + 1e-8 - label)*((1. + 1e-8 - pred).log())+(label)*(pred.log())).mean()
 
 
 def conv2d(x, weight, padding=(0, 0), stride=(1, 1)):
