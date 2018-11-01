@@ -3,6 +3,38 @@ The cTensor (crafted tensor) is a super light-weight deep learning library (perh
 
 Stars are welcomed! : )
 
+## File Structure
+
+### ctensor/tensor.py
+
+The file contains the definition of `Tensor` and its many basic operations. The definition of `Operator` enables user-defined operators on `Tensor` and therefore `forward` and `backward` in `numpy.ndarray` or `Tensor` (see example `View` class).
+
+### ctensor/operator.py
+
+The file includes some pre-defined `Operator`s on `Tensor`, e.g., `ReLU` and `Conv2d`. Note that misc things about `Conv2d` are exposed here as I am lazy to separate details and abstracts about it.
+
+### ctensor/functional.py
+
+An `Operator` subclass could be applied to `Tensor` only when an instance of the class are initiated. The file consists of functions that make an instance of the `Operator` and pass through it.
+
+### ctensor/optim.py
+
+`Optimizer`s here.
+
+### ctensor/nn.py
+
+High level abstracts of `Operator`s and their parameters. They are totally in PyTorch fashion.
+
+### testcase/*.py
+
+Some testcases. Maybe too hard to read although I've written up some comments.
+
+
+## Update
+
+### 2018.11.2
+Readme in more detail.
+
 ### 2018.9.28
 Add `nn.Conv2d`.
 
