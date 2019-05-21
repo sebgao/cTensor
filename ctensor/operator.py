@@ -125,7 +125,7 @@ def make_padding(input, padding):
         return input
     b, c, h, w = input.shape
     p, q = padding
-    result = np.zeros((b, c, h+2*p, w+2*q), dtype=np.float)
+    result = np.zeros((b, c, h+2*p, w+2*q), dtype=np.float32)
     result[:, :, p:-p, q:-q] = input
     return result
 
@@ -146,6 +146,6 @@ def dilate_input(input, stride=(1, 1)):
         return input
     isize = input.shape
     x = np.zeros((isize[0], isize[1], (isize[2]-1) *
-                  stride[0]+1, (isize[3]-1)*stride[1]+1))
+                  stride[0]+1, (isize[3]-1)*stride[1]+1), dtype=np.float32)
     x[..., ::stride[0], ::stride[1]] = input
     return x

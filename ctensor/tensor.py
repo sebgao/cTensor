@@ -14,7 +14,7 @@ def make_tensor_like(another, sel):
 
     if isinstance(another, int) or isinstance(another, float):
         s = (1,)*len(sel.data.shape)
-        return Tensor(np.zeros(s)+another, requires_grad=False)
+        return Tensor(np.zeros(s, dtype=np.float32)+another, requires_grad=False)
     return another
 
 
@@ -42,10 +42,10 @@ def attach_grad(u, grad):
 class Tensor:
     def __init__(self, ndarray, precedents=None, operator=None, requires_grad=True):
         
-        if ndarray.dtype == np.float:
+        if ndarray.dtype == np.float32:
             self.data = ndarray
         else:
-            self.data = ndarray.astype(np.float)
+            self.data = ndarray.astype(np.float32)
         
         if requires_grad:
             self.grad = np.zeros_like(self.data)
@@ -62,7 +62,7 @@ class Tensor:
 
     def backward(self, internal=False):
         if not internal:
-            self.grad = np.ones_like(self.data)
+            self.grad = np.ones_like(self.grad)
 
         if self.leaf:
             return
@@ -218,12 +218,15 @@ class Tensor:
 
     @staticmethod
     def zeros(args):
-        return Tensor(np.zeros(args))
+        return Tensor(np.zeros(args, dtype=np.float32))
 
     @staticmethod
     def randn(args):
-        return Tensor(np.random.randn(*args))
+        return Tensor(np.random.randn(*args, dtype=np.float32))
 
+    @staticmethod
+    def ones(args):
+        return Tensor(np.ones(args, dtype=np.float32))
 
 class Operator:
     def forward(self, *args):
@@ -254,3 +257,27 @@ class View(Operator):
     def backward(self, x, precedents):
         u, = precedents
         u.grad += x.grad.reshape(self.origin_shape)
+
+
+# class Add(Operator):
+#     def forward(self, x, y):
+#         return Tensor(x.data + y.data)
+    
+#     def backward(self, u, precedents):
+#         x, y = precedents
+#         x.grad += u.grad
+#         y.grad += u.grad
+
+
+# class Mul(Operator):
+#     def forward(self, x, y):
+#         return Tensor(x.data @ y.data)
+
+#     def backward(self, u, precedents):
+#         x, y = precedents
+#         if len(u.data.shape) == 3:
+#             attach_grad(x, u.grad @ T(y.data))
+#             attach_grad(y, T(x.data) @ u.grad)
+#         else:
+#             attach_grad(x, u.grad @ y.data.T)
+#             attach_grad(y, x.data.T @ u.grad)
