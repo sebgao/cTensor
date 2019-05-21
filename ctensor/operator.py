@@ -74,7 +74,8 @@ def batch_conv2d_weight_backward_f(kernel, input, stride=(1, 1)):
     '''kernel is result tensor grad, input is original tensor'''
     B, C, H, W = kernel.shape
     x = im2bchwkl(input, kernel.shape[-2:], dilation=stride)
-    return np.tensordot(x, kernel, [(0, 4, 5), (0, 2, 3)]).transpose(0, 3, 1, 2)*(1.0/(B*H*W))
+    print(B, H, W)
+    return np.tensordot(x, kernel, [(0, 4, 5), (0, 2, 3)]).transpose(0, 3, 1, 2)
 
 
 def batch_conv2d_im_backward_f(x, kernel, stride=(1, 1)):

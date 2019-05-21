@@ -41,8 +41,17 @@ def attach_grad(u, grad):
 
 class Tensor:
     def __init__(self, ndarray, precedents=None, operator=None, requires_grad=True):
-        self.data = ndarray.astype(np.float)
-        self.grad = np.zeros_like(self.data)
+        
+        if ndarray.dtype == np.float:
+            self.data = ndarray
+        else:
+            self.data = ndarray.astype(np.float)
+        
+        if requires_grad:
+            self.grad = np.zeros_like(self.data)
+        else:
+            self.grad = np.empty_like(self.data)
+            
         self.precedents = precedents
         self.operator = operator
         self.requires_grad = requires_grad

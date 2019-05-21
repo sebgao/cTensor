@@ -26,9 +26,9 @@ Y = Tensor(y.reshape(1000, 1))
 class Model(nn.Module):
     def __init__(self):
         self.main = nn.Sequential(
-            nn.Linear(5, 100),
+            nn.Linear(5, 1000),
             nn.ReLU(),
-            nn.Linear(100, 2),
+            nn.Linear(1000, 2),
             nn.Sigmoid(),
         )
     
@@ -38,7 +38,7 @@ class Model(nn.Module):
 model = Model()
 adam = Adam(model.parameters())
 
-for _ in range(10000):
+for _ in range(3000):
     indices = np.random.randint(0, 1000, size=128)
     X_ = X[indices]
     Y_ = Y[indices]

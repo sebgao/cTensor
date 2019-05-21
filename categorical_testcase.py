@@ -1,3 +1,7 @@
+import os
+import sys
+sys.path.append(os.path.abspath('..'))
+
 import numpy as np
 from ctensor import Tensor
 from ctensor.functional import leaky_relu, sigmoid, binary_cross_entropy
@@ -11,8 +15,8 @@ y = x[:, 0]**2-2*x[:, 1]+10*x[:, 2]+0.04*x[:, 3]+np.abs(2*x[:, 4])
 y = ((y+np.random.rand(1000)) > 17).astype(np.float)
 
 # Tensor Converting
-X = Tensor(x)
-Y = Tensor(y.reshape(1000, 1))
+X = Tensor(x, requires_grad=False)
+Y = Tensor(y.reshape(1000, 1), requires_grad=False)
 
 # Parameters
 M1 = Tensor(np.random.randn(5, 100)/500)

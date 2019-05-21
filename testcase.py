@@ -4,26 +4,23 @@ from ctensor.optim import Adam
 from ctensor.functional import conv2d, relu
 
 
-D = Tensor.randn((1, 1, 50, 50))
-T = Tensor.randn((1, 1, 1, 1))
-W1 = Tensor.randn((1, 32, 3, 3))/(4.5)
-W2 = Tensor.randn((32, 1, 3, 3))/(4.5*32)
-B1 = Tensor.zeros((1, 32, 1, 1))
-B2 = Tensor.zeros((1, 1, 1, 1))
-adam = Adam([W1, W2])
-for _ in range(1000):
-    I = conv2d(D, W1)#, padding=(1, 1))
-    I = relu(I)
-    I = conv2d(I, W2)#, padding=(1, 1))
+D = Tensor.zeros((4, 1, 900, 900)) + 1
+W1 = Tensor.zeros((1, 1, 3, 3)) + 1
+#adam = Adam([W1, W2])
+for _ in range(1):
+    I = conv2d(D, W1, padding=(1, 1))
+    I = I.mean()
     #I = (I)
-    loss = ((I-T)**2)
-    adam.zero_grad()
+    loss = (I**2)
     loss.backward()
-    adam.step(1e-5)
+    #adam.zero_grad()
+    print(W1.grad)
+    #loss.backward()
+    #adam.step(1e-5)
     #print(data.grad)
     #print(weight.grad)
 
-print(loss.mean())
+#print(loss.mean())
 
 # W1 = Tensor.randn((1, 100, 3, 3))/3.5
 # W2 = Tensor.randn((100, 1, 3, 3))/(3.5*100)
