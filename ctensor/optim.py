@@ -8,7 +8,8 @@ class Optimizer:
 
     def zero_grad(self):
         for p in self.parameters:
-            p.grad = np.zeros_like(p.data)
+            #p.grad = np.zeros_like(p.data)
+            p.grad *= 0.0
 
     def step(self, lr=0.01):
         assert False, 'Optimizer class is virtual'

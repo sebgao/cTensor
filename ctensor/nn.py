@@ -43,28 +43,34 @@ class Linear(Module):
         self.w = Parameter(np.random.randn(
             in_channels, out_channels)/((in_channels*out_channels)))
         if bias:
-            self.bias = Parameter(np.zeros(((1, out_channels))))
+            self.bias = Parameter(Tensor.zeros(((1, out_channels))))
         else:
-            self.bias = 0
+            self.bias = None
     
     def forward(self, x):
-        return x @ self.w + self.bias
+        if self.bias:
+            return x @ self.w + self.bias
+        else:
+            return x @ self.w
 
 class Conv2d(Module):
     def __init__(self, in_channels, out_channels, kernel_size=(3, 3), padding=(1, 1), stride=(1, 1), bias=True):
         param = (in_channels, ) + (out_channels, ) + kernel_size
         self.w = Parameter(
-            np.random.randn(*param)/(in_channels*(kernel_size[0]*kernel_size[1])**0.5)
+            Tensor.randn(*param)/(in_channels*(kernel_size[0]*kernel_size[1])**0.5)
             )
         if bias:
-            self.bias = Parameter(np.zeros((1, out_channels, 1, 1)))
+            self.bias = Parameter(Tensor.zeros((1, out_channels, 1, 1)))
         else:
-            self.bias = 0
+            self.bias = None
         self.padding = padding
         self.stride = stride
     
     def forward(self, x):
-        return F.conv2d(x, self.w, self.padding, self.stride) + self.bias
+        if self.bias:
+            return F.conv2d(x, self.w, self.padding, self.stride) + self.bias
+        else:
+            return F.conv2d(x, self.w, self.padding, self.stride)
 
 class ReLU(Module):
     def forward(self, x):
