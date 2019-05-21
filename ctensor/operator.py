@@ -74,7 +74,6 @@ def batch_conv2d_weight_backward_f(kernel, input, stride=(1, 1)):
     '''kernel is result tensor grad, input is original tensor'''
     B, C, H, W = kernel.shape
     x = im2bchwkl(input, kernel.shape[-2:], dilation=stride)
-    print(B, H, W)
     return np.tensordot(x, kernel, [(0, 4, 5), (0, 2, 3)]).transpose(0, 3, 1, 2)
 
 
@@ -83,7 +82,6 @@ def batch_conv2d_im_backward_f(x, kernel, stride=(1, 1)):
     ksize = kernel.shape
     x = dilate_input(x, stride)
     x = make_padding(x, ((ksize[2]-1), (ksize[3]-1)))
-    #print(x.shape, kernel.shape)
     return batch_transposed_conv2d_f(x, kernel, invert=True)
 
 
@@ -94,7 +92,6 @@ def batch_transposed_conv2d_f(x, kernel, invert=False):
     )
     i = 1 if invert else 0
     return np.tensordot(x, kernel, [(1, 4, 5), (i, 2, 3)]).transpose(0, 3, 1, 2)
-    #return np.einsum(operator, x, kernel)
 
 
 def im2bchwkl(input, ksize, stride=(1, 1), padding=(0, 0), dilation=(1, 1), writeable=False):

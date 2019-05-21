@@ -1,45 +1,28 @@
 import numpy as np
 from ctensor import Tensor
-from ctensor.optim import Adam
 from ctensor.functional import conv2d, relu
 
 
-D = Tensor.zeros((4, 1, 900, 900)) + 1
+D = Tensor.zeros((4, 1, 199, 199)) + 1
 W1 = Tensor.zeros((1, 1, 3, 3)) + 1
-#adam = Adam([W1, W2])
-for _ in range(1):
-    I = conv2d(D, W1, padding=(1, 1))
-    I = I.mean()
-    #I = (I)
-    loss = (I**2)
-    loss.backward()
-    #adam.zero_grad()
-    print(W1.grad)
-    #loss.backward()
-    #adam.step(1e-5)
-    #print(data.grad)
-    #print(weight.grad)
 
-#print(loss.mean())
+I = conv2d(D, W1, padding=(1, 1))
+I.mean().backward()
+print(W1.grad)
 
-# W1 = Tensor.randn((1, 100, 3, 3))/3.5
-# W2 = Tensor.randn((100, 1, 3, 3))/(3.5*100)
-# B1 = Tensor.zeros((1, 100, 3, 3))
-# adam = Adam([W1, W2, B1])
-# for _ in range(1000):
-#     #print(data.data.std())
-#     I1 = conv2d(data, W1)+B1
-#     #print(I.data.std(), I.data.mean())
-#     I2 = leaky_relu(I1)
-#     #print(I.data.std(), I.data.mean())
-#     I3 = conv2d(I2, W2)
-#     #print(I.data.std(), I.data.mean())
-#     K = (I3-1)**2
-#     adam.zero_grad()
-#     K.backward()
-#     adam.step(1e-3)
+D = Tensor.zeros((1, 1, 19, 19)) + 1
+W1 = Tensor.zeros((1, 1, 3, 3)) + 1
 
-# print(K)
-# print(I1.data.std(), I1.grad.std())
-# print(I2.data.std(), I2.grad.std())
-# print(I3.data.std(), I3.grad.std())
+I = conv2d(D, W1, padding=(1, 1))
+I.mean().backward()
+print(W1.grad)
+
+D = Tensor.zeros((1, 100)) + 1
+W1 = Tensor.zeros((100, 50)) + 1
+(D @ W1).mean().backward()
+print(W1.grad)
+
+D = Tensor.zeros((100, 100)) + 1
+W1 = Tensor.zeros((100, 50)) + 1
+(D @ W1).mean().backward()
+print(W1.grad)
