@@ -10,6 +10,7 @@ class Optimizer:
         for p in self.parameters:
             #p.grad = np.zeros_like(p.data)
             p.grad *= 0.0
+            p.backward_outdegree = 0
 
     def step(self, lr=0.01):
         assert False, 'Optimizer class is virtual'

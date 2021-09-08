@@ -55,8 +55,13 @@ class Tensor:
         self.precedents = precedents
         self.operator = operator
         self.requires_grad = requires_grad
+        self.outdegree = 0
+        self.backward_outdegree = 0
+
         if precedents:
             self.leaf = False
+            for p in precedents:
+                p.outdegree += 1
         else:
             self.leaf = True
 
@@ -64,8 +69,13 @@ class Tensor:
         if not internal:
             self.grad = np.ones_like(self.grad)
 
+        self.backward_outdegree += 1
+
         if self.leaf:
             return
+
+        if self.backward_outdegree < self.outdegree:
+            return 
 
         if isinstance(self.operator, Operator):
             self.operator.backward(self, self.precedents)
@@ -258,6 +268,7 @@ class View(Operator):
         u, = precedents
         u.grad += x.grad.reshape(self.origin_shape)
 
+# Listed are user-defined version of basic operator (Add & Mul)
 
 # class Add(Operator):
 #     def forward(self, x, y):
