@@ -61,7 +61,8 @@ class Tensor:
         if precedents:
             self.leaf = False
             for p in precedents:
-                p.outdegree += 1
+                if isinstance(p, Tensor):
+                    p.outdegree += 1
         else:
             self.leaf = True
 
